@@ -18,24 +18,4 @@
 #
 ##############################################################################
 
-
-from odoo import models, fields, api, SUPERUSER_ID
-
-
-class IrUiMenu(models.Model):
-    _inherit = 'ir.ui.menu'
-
-    invis_groups_ids = fields.Many2many(
-        'res.groups', 'menu_invisible_group_rel',
-        'menu_id', 'group_id', 'Invisible Groups')
-
-    @api.multi
-    @api.returns('self')
-    def _filter_visible_menus(self):
-        visible = super(IrUiMenu, self)._filter_visible_menus()
-        groups = self.env.user.groups_id
-        if self._uid != SUPERUSER_ID:
-            visible = [menu for menu in visible
-                       if not any(group in groups
-                                  for group in menu.invis_groups_ids)]
-        return self.filtered(lambda menu: menu in visible)
+import convert

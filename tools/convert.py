@@ -22,7 +22,7 @@ import misc
 import logging
 import os.path
 
-from openerp.tools.convert import xml_import, convert_xml_import
+from odoo.tools.convert import xml_import, convert_xml_import
 from lxml import etree
 from xml.dom import minidom
 from xml.dom.minidom import Document
@@ -38,7 +38,7 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
     # if non-empty determine its ID, otherwise
     # explicitly make a top-level menu
     if rec.get('parent'):
-        menu_parent_id = self.id_get(cr, rec.get('parent',''))
+        menu_parent_id = self.id_get(rec.get('parent',''))
     else:
         # we get here with <menuitem parent="">, explicit clear of parent, or
         # if no parent attribute at all but menu name is not a menu path
@@ -47,7 +47,7 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
     if rec.get('name'):
         values['name'] = rec.get('name')
     try:
-        res = [ self.id_get(cr, rec.get('id','')) ]
+        res = [ self.id_get(rec.get('id','')) ]
     except:
         res = None
 
@@ -55,16 +55,16 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
         a_action = rec.get('action','').encode('utf8')
 
         # determine the type of action
-        action_type, action_id = self.model_id_get(cr, a_action)
+        action_type, action_id = self.model_id_get(a_action)
         action_type = action_type.split('.')[-1] # keep only type part
         values['action'] = "ir.actions.%s,%d" % (action_type, action_id)
 
         if not values.get('name') and action_type in (
-                        'act_window', 'wizard', 'url', 'client', 'server'):
+                    'act_window', 'wizard', 'url', 'client', 'server'):
             a_table = 'ir_act_%s' % action_type.replace('act_', '')
-            cr.execute('select name from "%s" where id=%%s' % a_table,
-                       (int(action_id),))
-            resw = cr.fetchone()
+            self.cr.execute('select name from "%s" where id=%%s' % a_table,
+                            (int(action_id),))
+            resw = self.cr.fetchone()
             if resw:
                 values['name'] = resw[0]
 
@@ -72,6 +72,8 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
         # ensure menu has a name
         values['name'] = rec_id or '?'
 
+    if rec.get('load_xmlid'):
+        values['load_xmlid'] = True
     if rec.get('sequence'):
         values['sequence'] = int(rec.get('sequence'))
 
@@ -80,10 +82,10 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
         groups_value = []
         for group in g_names:
             if group.startswith('-'):
-                group_id = self.id_get(cr, group[1:])
+                group_id = self.id_get(group[1:])
                 groups_value.append((3, group_id))
             else:
-                group_id = self.id_get(cr, group)
+                group_id = self.id_get(group)
                 groups_value.append((4, group_id))
         values['groups_id'] = groups_value
 
@@ -103,10 +105,10 @@ def _tag_menuitem(self, rec, data_node=None, mode=None):
         if rec.get('web_icon'):
             values['web_icon'] = rec.get('web_icon')
 
-    pid = self.pool['ir.model.data']._update(
-            cr, self.uid, 'ir.ui.menu', self.module, values,
-            rec_id, noupdate=self.isnoupdate(data_node),
-            mode=self.mode, res_id=res and res[0] or False)
+    pid = self.env['ir.model.data']._update(
+            'ir.ui.menu', self.module, values, rec_id,
+            noupdate=self.isnoupdate(data_node), mode=self.mode,
+            res_id=res and res[0] or False)
 
     if rec_id and pid:
         self.idref[rec_id] = int(pid)
@@ -139,9 +141,8 @@ def convert_xml_import(cr, module, xmlfile, idref=None, mode='init',
     try:
         relaxng.assert_(doc)
     except Exception:
-        _logger.info('The XML file does not fit the required schema !',
-                     exc_info=True)
-        _logger.info(misc.ustr(relaxng.error_log.last_error))
+        _logger.info('The XML file does not fit the required schema !', exc_info=True)
+        _logger.info(ustr(relaxng.error_log.last_error))
         raise
 
     if idref is None:
@@ -150,8 +151,8 @@ def convert_xml_import(cr, module, xmlfile, idref=None, mode='init',
         xml_filename = xmlfile.name
     else:
         xml_filename = xmlfile
-    obj = xml_import(cr, module, idref, mode, report=report,
-                     noupdate=noupdate, xml_filename=xml_filename)
+    obj = xml_import(cr, module, idref, mode, report=report, noupdate=noupdate,
+                     xml_filename=xml_filename)
     obj.parse(doc.getroot(), mode=mode)
     return True
 
